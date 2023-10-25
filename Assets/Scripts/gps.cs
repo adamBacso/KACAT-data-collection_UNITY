@@ -13,30 +13,39 @@ public class gps : MonoBehaviour
     private string gpsSentence;
     private const char checksumEnd = '*';
 
+    [SerializeField] private Vector3 startVelocity = new Vector3(6, 50, 3);
     private Vector3 velocity;
+    [SerializeField] private float drag = 0.98f;
     private Vector3 position;
-
-
     [SerializeField] private Vector3 startingPosition;
-    private TimeSpan elapsedTime;
-    private DateTime startingTime;
-    [SerializeField] private float timeTick;
 
     private float latitudeChange = 111319.9f;
+
+    private TimeSpan elapsedTime;
+    private DateTime startingTime;
+    private float timeTick;
 
     private void Start()
     {
         Initiate(4729.33f, 1903.05f, 153f);
         timeTick = Time.fixedDeltaTime;
+        velocity = startVelocity;
     }
-     
-    public void UpdateGPS(Vector3 acceleration)
-    {
-        velocity += acceleration * timeTick;
 
+    private void FixedUpdate()
+    {
+        if (position.y < 0)
+            velocity = startVelocity;
+        UpdateGPS();
+    }
+
+    private void UpdateGPS()
+    {
+        velocity.y += Physics.gravity.y * timeTick;
+        velocity *= drag;
         position.x += velocity.x * timeTick / latitudeChange;
-        position.y += velocity.y * timeTick / (latitudeChange * Mathf.Cos(Mathf.Deg2Rad * position.x));
-        position.z += velocity.z * timeTick;
+        position.y += velocity.y * timeTick;
+        position.z += velocity.z * timeTick / (latitudeChange * Mathf.Cos(Mathf.Deg2Rad * position.x));
     }
     
     void Initiate(float lon, float lat, float alt)
@@ -44,8 +53,8 @@ public class gps : MonoBehaviour
         startingTime = DateTime.Now;
 
         position.x = lat;
-        position.y = lon;
-        position.z = alt;
+        position.z = lon;
+        position.y = alt;
 
         velocity.x = 0;
         velocity.y = 0;
@@ -87,12 +96,12 @@ public class gps : MonoBehaviour
             time.ToString(),
             position.x.ToString(),
             latHemisphere,
-            position.y.ToString(),
+            position.z.ToString(),
             lonHemisphere,
             fix.ToString(),
             satellites.ToString(),
             hdop.ToString(),
-            position.z.ToString(),
+            position.y.ToString(),
             altitudeUnit,
             hGeoid.ToString(),
             hGeoidUnit,
@@ -105,13 +114,14 @@ public class gps : MonoBehaviour
         return sentence;
     }
 
-    byte CalculateChecksum(string sentence)
+    string CalculateChecksum(string sentence)
     {
         byte checksum = 0;
+        byte[] charBytes = Encoding.UTF8.GetBytes(sentence);
         for (int i = 1; i < sentence.Length; i++)
         {
-            checksum ^= Encoding.UTF8.GetBytes(sentence)[0];
+            checksum ^= charBytes[i];
         }
-        return checksum;
+        return checksum.ToString("X2");
     }
 }
