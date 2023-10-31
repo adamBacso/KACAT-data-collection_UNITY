@@ -1,25 +1,16 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
-using Unity.VisualScripting;
-using UnityEditorInternal;
 using UnityEngine;
 
 public class gps : MonoBehaviour
 {
     [SerializeField] private string gpsIdentifier = "$GPGGA";
-    private string gpsSentence;
     private const char checksumEnd = '*';
 
-    [SerializeField] private Vector3 startVelocity = new Vector3(6, 50, 3);
+    [SerializeField] private Vector3 startVelocity;
     private Vector3 velocity;
     [SerializeField] private float drag = 0.98f;
     private Vector3 position;
     [SerializeField] private Vector3 startingPosition;
-
-    private float latitudeChange = 111319.9f;
 
     private TimeSpan elapsedTime;
     private DateTime startingTime;
@@ -27,50 +18,52 @@ public class gps : MonoBehaviour
 
     private void Start()
     {
-        Initiate(4729.33f, 1903.05f, 153f);
+        Initiate();
         timeTick = Time.fixedDeltaTime;
-        velocity = startVelocity;
     }
 
     private void FixedUpdate()
     {
-        if (position.y < 0)
-            velocity = startVelocity;
         UpdateGPS();
     }
 
     private void UpdateGPS()
     {
+        if (position.y< 0)
+            velocity = startVelocity;
+
         velocity.y += Physics.gravity.y * timeTick;
         velocity *= drag;
-        position.x += velocity.x * timeTick / latitudeChange;
+        position.x += velocity.x * timeTick;
         position.y += velocity.y * timeTick;
-        position.z += velocity.z * timeTick / (latitudeChange * Mathf.Cos(Mathf.Deg2Rad * position.x));
+        position.z += velocity.z * timeTick;
+
     }
-    
-    void Initiate(float lon, float lat, float alt)
+
+    void Initiate()
     {
         startingTime = DateTime.Now;
 
-        position.x = lat;
-        position.z = lon;
-        position.y = alt;
+        position.x = 0;
+        position.z = 0;
+        position.y = 0;
 
-        velocity.x = 0;
-        velocity.y = 0;
-        velocity.z = 0;
-
-        startingPosition.x = position.x;
-        startingPosition.y = position.y;
-        startingPosition.z = position.z;
+        velocity = startVelocity;
     }
 
+    float latitude;
+    float longitude;
     public string WriteSentence()
     {
-        string latHemisphere;
+        float rEarth = 6371000f;
+
+        longitude = (startingPosition.z * Mathf.Deg2Rad + position.z / (rEarth * Mathf.Cos(latitude*Mathf.Deg2Rad))) * Mathf.Rad2Deg;
         string lonHemisphere;
-        float time = DateTime.Now.Hour*10000 + DateTime.Now.Minute*100 + DateTime.Now.Second + DateTime.Now.Millisecond/100;
-        
+
+        latitude = (startingPosition.x * Mathf.Deg2Rad + position.x / rEarth) * Mathf.Rad2Deg;
+        string latHemisphere;
+        float time = (float)DateTime.Now.Hour*10000 + (float)DateTime.Now.Minute*100 + (float)DateTime.Now.Second + ((float)DateTime.Now.Millisecond)/100;
+
         if (position.x > 0)
             latHemisphere = "N";
         else
@@ -84,6 +77,7 @@ public class gps : MonoBehaviour
         int fix = 1;
         int satellites = 8;
         float hdop = 0.9f;
+        float altitude = position.y;
         string altitudeUnit = "M";
         float hGeoid = 46.9f;
         string hGeoidUnit = "M";
@@ -94,14 +88,14 @@ public class gps : MonoBehaviour
         {
             gpsIdentifier,
             time.ToString(),
-            position.x.ToString(),
+            latitude.ToString(),
             latHemisphere,
-            position.z.ToString(),
+            longitude.ToString(),
             lonHemisphere,
             fix.ToString(),
             satellites.ToString(),
             hdop.ToString(),
-            position.y.ToString(),
+            altitude.ToString(),
             altitudeUnit,
             hGeoid.ToString(),
             hGeoidUnit,
@@ -109,19 +103,9 @@ public class gps : MonoBehaviour
             checksumEnd
         };
 
-        string sentence = string.Join(',',gpsData);
-        sentence += CalculateChecksum(sentence).ToString();
+        string sentence = string.Join(',', gpsData); ;
         return sentence;
     }
 
-    string CalculateChecksum(string sentence)
-    {
-        byte checksum = 0;
-        byte[] charBytes = Encoding.UTF8.GetBytes(sentence);
-        for (int i = 1; i < sentence.Length; i++)
-        {
-            checksum ^= charBytes[i];
-        }
-        return checksum.ToString("X2");
-    }
+
 }
